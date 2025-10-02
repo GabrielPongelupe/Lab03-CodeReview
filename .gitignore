@@ -1,0 +1,38 @@
+# Arquivos do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg
+*.egg-info/
+*.so
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+ENV/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_save
+*.ipynb~
+
+# Configurações locais
+*.DS_Store
+*.vscode/
+*.idea/
+
+# Arquivos de ambiente (tokens, senhas)
+.env
+
+# Dados (manter só os processados se quiser)
+data/raw/*
+!data/raw/.gitkeep
+
+# Logs e temporários
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
