@@ -57,6 +57,66 @@ Lab03-CodeReview/
 ```
 
 ---
+# ⚙️ Guia de Execução no Windows
+
+### 🔹 Windows (PowerShell ou CMD)
+
+1. **Clone o repositório**
+
+```powershell
+git clone https://github.com/seu-usuario/Lab03-CodeReview.git
+cd Lab03-CodeReview
+```
+
+2. **Crie um ambiente virtual**
+
+```powershell
+python -m venv .venv
+```
+
+3. **Ative o ambiente virtual**
+
+- No **PowerShell**:
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+- No **CMD**:
+
+```cmd
+.\.venv\Scripts\activate.bat
+```
+
+⚠️ Caso o PowerShell bloqueie a execução, execute antes (apenas na sessão atual):
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+```
+
+4. **Instale as dependências**
+
+```powershell
+pip install -r requirements.txt
+```
+
+5. **Configure o Token do GitHub**
+
+Crie um arquivo `.env` na raiz do projeto com o conteúdo:
+
+```ini
+GITHUB_TOKEN=seu_token_aqui
+```
+
+6. **Execute os scripts**
+
+```powershell
+python scripts\fetch_repos.py
+python scripts\fetch_prs.py
+python scripts\process_data.py
+```
+
+
 
 ## ⚙️ Como Rodar no Linux
 
