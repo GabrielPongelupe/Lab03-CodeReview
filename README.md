@@ -71,7 +71,7 @@ cd Lab03-CodeReview
 2. **Crie um ambiente virtual**
 
 ```powershell
-python -m venv .venv
+py -m venv .venv
 ```
 
 3. **Ative o ambiente virtual**
