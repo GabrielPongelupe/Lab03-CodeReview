@@ -20,11 +20,38 @@ def fetch_pr_details(repo_full_name, pr_number):
     return r.json()
 
 
+def fetch_reviews(repo_full_name, pr_number):
+    """Busca todas as revisões (reviews) do PR"""
+    url = f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/reviews"
+    r = requests.get(url, headers=HEADERS)
+    if r.status_code != 200:
+        return []
+    return r.json()
+
+
+def fetch_issue_comments(repo_full_name, pr_number):
+    """Busca comentários gerais do PR (não inline)"""
+    url = f"https://api.github.com/repos/{repo_full_name}/issues/{pr_number}/comments"
+    r = requests.get(url, headers=HEADERS)
+    if r.status_code != 200:
+        return []
+    return r.json()
+
+
+def fetch_review_comments(repo_full_name, pr_number):
+    """Busca comentários de revisão (inline)"""
+    url = f"https://api.github.com/repos/{repo_full_name}/pulls/{pr_number}/comments"
+    r = requests.get(url, headers=HEADERS)
+    if r.status_code != 200:
+        return []
+    return r.json()
+
+
 def fetch_prs(repo_full_name, state="all", max_pages=2):
-    """Busca PRs de um repositório"""
+    """Busca PRs de um repositório e coleta métricas adicionais"""
     prs = []
     print(f"\n[INFO] Coletando PRs de {repo_full_name}...")
-    for page in range(1, max_pages+1):
+    for page in range(1, max_pages + 1):
         url = f"https://api.github.com/repos/{repo_full_name}/pulls?state={state}&per_page=100&page={page}"
         print(f"[INFO] Requisitando página {page} de PRs em {repo_full_name}")
         r = requests.get(url, headers=HEADERS)
@@ -44,7 +71,30 @@ def fetch_prs(repo_full_name, state="all", max_pages=2):
             if not pr_detail:
                 continue
 
+            # Buscar informações extras
+            reviews = fetch_reviews(repo_full_name, pr["number"])
+            issue_comments = fetch_issue_comments(repo_full_name, pr["number"])
+            review_comments = fetch_review_comments(repo_full_name, pr["number"])
+
+            # Contar participantes únicos
+            participants = set()
+            if pr_detail.get("user") and pr_detail["user"].get("login"):
+                participants.add(pr_detail["user"]["login"])
+
+            for review in reviews:
+                if review.get("user") and review["user"].get("login"):
+                    participants.add(review["user"]["login"])
+
+            for comment in issue_comments:
+                if comment.get("user") and comment["user"].get("login"):
+                    participants.add(comment["user"]["login"])
+
+            for comment in review_comments:
+                if comment.get("user") and comment["user"].get("login"):
+                    participants.add(comment["user"]["login"])
+
             prs.append({
+                "repo_full_name": repo_full_name,
                 "id": pr_detail["id"],
                 "number": pr_detail["number"],
                 "title": pr_detail["title"],
@@ -59,10 +109,17 @@ def fetch_prs(repo_full_name, state="all", max_pages=2):
                 "deletions": pr_detail.get("deletions", 0),
                 "state": pr_detail["state"],
                 "merged": pr_detail.get("merged", False),
-                "body_length": len(pr_detail["body"]) if pr_detail.get("body") else 0
+                "body_length": len(pr_detail["body"]) if pr_detail.get("body") else 0,
+
+                # Novas métricas
+                "reviews_count": len(reviews),
+                "issue_comments_count": len(issue_comments),
+                "inline_review_comments_count": len(review_comments),
+                "participants_count": len(participants)
             })
+
             # Pausa leve para evitar rate limit
-            time.sleep(0.2)
+            time.sleep(0.25)
 
         print(f"[INFO] Página {page} de {repo_full_name} concluída. PRs coletados até agora: {len(prs)}")
 
