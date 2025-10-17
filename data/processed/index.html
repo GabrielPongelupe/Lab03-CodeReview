@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Code Review no GitHub</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+        
+        .header p {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .stat-card h3 {
+            color: #667eea;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .stat-card .value {
+            color: #333;
+            font-size: 2em;
+            font-weight: bold;
+        }
+        
+        .charts-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+            gap: 30px;
+        }
+        
+        .chart-card {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .chart-card h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.3em;
+            border-left: 4px solid #667eea;
+            padding-left: 15px;
+        }
+        
+        .chart-wrapper {
+            position: relative;
+            height: 400px;
+        }
+        
+        .dimension-title {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 30px 0 20px 0;
+            text-align: center;
+            font-size: 1.5em;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: white;
+            font-size: 1.5em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Análise de Code Review no GitHub</h1>
+            <p>Laboratório 03 - Caracterizando a Atividade de Code Review</p>
+        </div>
+        
+        <div id="loading" class="loading">Carregando dados...</div>
+        
+        <div id="content" style="display: none;">
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total de PRs</h3>
+                    <div class="value" id="totalPRs">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>PRs Merged</h3>
+                    <div class="value" id="mergedPRs">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>PRs Closed</h3>
+                    <div class="value" id="closedPRs">-</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Taxa de Aceitação</h3>
+                    <div class="value" id="acceptanceRate">-</div>
+                </div>
+            </div>
+            
+            <div class="dimension-title">Dimensão A: Feedback Final das Revisões</div>
+            
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h2>RQ01: Tamanho dos PRs vs Status Final</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq01Chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h2>RQ02: Tempo de Análise vs Status Final</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq02Chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h2>RQ03: Descrição dos PRs vs Status Final</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq03Chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h2>RQ04: Interações nos PRs vs Status Final</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq04Chart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="dimension-title">Dimensão B: Número de Revisões</div>
+            
+            <div class="charts-container">
+                <div class="chart-card">
+                    <h2>RQ05: Tamanho dos PRs vs Nº de Revisões</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq05Chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h2>RQ06: Tempo de Análise vs Nº de Revisões</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq06Chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h2>RQ07: Descrição dos PRs vs Nº de Revisões</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq07Chart"></canvas>
+                    </div>
+                </div>
+                
+                <div class="chart-card">
+                    <h2>RQ08: Interações nos PRs vs Nº de Revisões</h2>
+                    <div class="chart-wrapper">
+                        <canvas id="rq08Chart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Dados CSV embutidos
+        function loadCSV() {
+        // Ler arquivo CSV do diretório do projeto
+        Papa.parse('prs_clean.csv', {
+            download: true,  // ← Importante: faz o download do arquivo
+            header: true,
+            dynamicTyping: true,
+            skipEmptyLines: true,
+            complete: function(results) {
+                allData = results.data.map(row => ({
+                    merged: row.merged === 'True' || row.merged === true,
+                    files_changed: parseInt(row.changed_files) || 0,
+                    lines_added: parseInt(row.additions) || 0,
+                    lines_removed: parseInt(row.deletions) || 0,
+                    body_length: parseInt(row.body_length) || 0,
+                    num_participants: 1,
+                    num_comments: (parseInt(row.comments) || 0) + (parseInt(row.review_comments) || 0),
+                    num_reviews: (parseInt(row.review_comments) || 0) > 0 ? 1 : 0,
+                    review_time_h: parseFloat(row.review_time_h) || 0
+                }));
+                
+                updateStats();
+                createCharts();
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('content').style.display = 'block';
+            },
+            error: function(error) {
+                console.error('Erro ao carregar CSV:', error);
+                document.getElementById('loading').innerHTML = 
+                    '<p style="color: red;">❌ Erro ao carregar o arquivo prs_clean.csv</p>' +
+                    '<p>Verifique se o arquivo está no mesmo diretório do HTML.</p>';
+            }
+        });
+    }
+
+        let allData = [];
+
+        function parseCSV() {
+            Papa.parse(csvData, {
+                header: true,
+                dynamicTyping: true,
+                skipEmptyLines: true,
+                complete: function(results) {
+                    allData = results.data.map(row => ({
+                        merged: row.merged === 'True' || row.merged === true,
+                        files_changed: parseInt(row.changed_files) || 0,
+                        lines_added: parseInt(row.additions) || 0,
+                        lines_removed: parseInt(row.deletions) || 0,
+                        body_length: parseInt(row.body_length) || 0,
+                        num_participants: 1, // Simplificação - seria calculado dos dados
+                        num_comments: (parseInt(row.comments) || 0) + (parseInt(row.review_comments) || 0),
+                        num_reviews: (parseInt(row.review_comments) || 0) > 0 ? 1 : 0, // Simplificação
+                        review_time_h: parseFloat(row.review_time_h) || 0
+                    }));
+                    
+                    updateStats();
+                    createCharts();
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('content').style.display = 'block';
+                }
+            });
+        }
+
+        function updateStats() {
+            const total = allData.length;
+            const merged = allData.filter(pr => pr.merged).length;
+            const closed = total - merged;
+            const rate = ((merged / total) * 100).toFixed(1);
+            
+            document.getElementById('totalPRs').textContent = total;
+            document.getElementById('mergedPRs').textContent = merged;
+            document.getElementById('closedPRs').textContent = closed;
+            document.getElementById('acceptanceRate').textContent = rate + '%';
+        }
+
+        function calculateMedian(arr) {
+            const sorted = [...arr].sort((a, b) => a - b);
+            const mid = Math.floor(sorted.length / 2);
+            return sorted.length % 2 === 0 
+                ? (sorted[mid - 1] + sorted[mid]) / 2 
+                : sorted[mid];
+        }
+
+        function createCharts() {
+            const merged = allData.filter(pr => pr.merged);
+            const closed = allData.filter(pr => !pr.merged);
+            
+            // RQ01: Tamanho vs Status
+            createRQ01Chart(merged, closed);
+            
+            // RQ02: Tempo vs Status
+            createRQ02Chart(merged, closed);
+            
+            // RQ03: Descrição vs Status
+            createRQ03Chart(merged, closed);
+            
+            // RQ04: Interações vs Status
+            createRQ04Chart(merged, closed);
+            
+            // RQ05-08: Correlações com número de revisões
+            createRQ05Chart();
+            createRQ06Chart();
+            createRQ07Chart();
+            createRQ08Chart();
+        }
+
+        function createRQ01Chart(merged, closed) {
+            const ctx = document.getElementById('rq01Chart').getContext('2d');
+            
+            // Métricas: arquivos, linhas adicionadas, linhas removidas
+            const mergedFiles = calculateMedian(merged.map(pr => pr.files_changed));
+            const closedFiles = calculateMedian(closed.map(pr => pr.files_changed));
+            
+            const mergedLines = calculateMedian(merged.map(pr => pr.lines_added + pr.lines_removed));
+            const closedLines = calculateMedian(closed.map(pr => pr.lines_added + pr.lines_removed));
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Arquivos Modificados', 'Total de Linhas'],
+                    datasets: [{
+                        label: 'Merged (Mediana)',
+                        data: [mergedFiles, mergedLines],
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2
+                    }, {
+                        label: 'Closed (Mediana)',
+                        data: [closedFiles, closedLines],
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Comparação de Tamanho: Merged vs Closed'
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function createRQ02Chart(merged, closed) {
+            const ctx = document.getElementById('rq02Chart').getContext('2d');
+            
+            const mergedTime = calculateMedian(merged.map(pr => pr.review_time_h));
+            const closedTime = calculateMedian(closed.map(pr => pr.review_time_h));
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Tempo de Análise (horas)'],
+                    datasets: [{
+                        label: 'Merged (Mediana)',
+                        data: [mergedTime],
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2
+                    }, {
+                        label: 'Closed (Mediana)',
+                        data: [closedTime],
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Tempo de Análise: Merged vs Closed'
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function createRQ03Chart(merged, closed) {
+            const ctx = document.getElementById('rq03Chart').getContext('2d');
+            
+            const mergedDesc = calculateMedian(merged.map(pr => pr.body_length));
+            const closedDesc = calculateMedian(closed.map(pr => pr.body_length));
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Caracteres na Descrição'],
+                    datasets: [{
+                        label: 'Merged (Mediana)',
+                        data: [mergedDesc],
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2
+                    }, {
+                        label: 'Closed (Mediana)',
+                        data: [closedDesc],
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Tamanho da Descrição: Merged vs Closed'
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function createRQ04Chart(merged, closed) {
+            const ctx = document.getElementById('rq04Chart').getContext('2d');
+            
+            const mergedComments = calculateMedian(merged.map(pr => pr.num_comments));
+            const closedComments = calculateMedian(closed.map(pr => pr.num_comments));
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['Número de Comentários'],
+                    datasets: [{
+                        label: 'Merged (Mediana)',
+                        data: [mergedComments],
+                        backgroundColor: 'rgba(75, 192, 192, 0.6)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 2
+                    }, {
+                        label: 'Closed (Mediana)',
+                        data: [closedComments],
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Interações: Merged vs Closed'
+                        }
+                    },
+                    scales: {
+                        y: { beginAtZero: true }
+                    }
+                }
+            });
+        }
+
+        function createRQ05Chart() {
+            const ctx = document.getElementById('rq05Chart').getContext('2d');
+            
+            // Scatter plot: Tamanho vs Número de Revisões
+            const data = allData.map(pr => ({
+                x: pr.files_changed + (pr.lines_added + pr.lines_removed) / 100,
+                y: pr.num_reviews
+            }));
+            
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'PRs',
+                        data: data,
+                        backgroundColor: 'rgba(102, 126, 234, 0.6)',
+                        borderColor: 'rgba(102, 126, 234, 1)',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Tamanho (arquivos + linhas/100) vs Nº Revisões'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tamanho do PR'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Revisões'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createRQ06Chart() {
+            const ctx = document.getElementById('rq06Chart').getContext('2d');
+            
+            const data = allData.map(pr => ({
+                x: pr.review_time_h,
+                y: pr.num_reviews
+            }));
+            
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'PRs',
+                        data: data,
+                        backgroundColor: 'rgba(118, 75, 162, 0.6)',
+                        borderColor: 'rgba(118, 75, 162, 1)',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Tempo de Análise vs Nº Revisões'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Tempo (horas)'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Revisões'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createRQ07Chart() {
+            const ctx = document.getElementById('rq07Chart').getContext('2d');
+            
+            const data = allData.map(pr => ({
+                x: pr.body_length,
+                y: pr.num_reviews
+            }));
+            
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'PRs',
+                        data: data,
+                        backgroundColor: 'rgba(255, 159, 64, 0.6)',
+                        borderColor: 'rgba(255, 159, 64, 1)',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Tamanho da Descrição vs Nº Revisões'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Caracteres na Descrição'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Revisões'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function createRQ08Chart() {
+            const ctx = document.getElementById('rq08Chart').getContext('2d');
+            
+            const data = allData.map(pr => ({
+                x: pr.num_comments,
+                y: pr.num_reviews
+            }));
+            
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: 'PRs',
+                        data: data,
+                        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'top' },
+                        title: {
+                            display: true,
+                            text: 'Número de Comentários vs Nº Revisões'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Número de Comentários'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Número de Revisões'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+           loadCSV();
+        // Inicializar
+        parseCSV();
+    </script>
+</body>
+</html>

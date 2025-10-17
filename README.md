@@ -39,37 +39,39 @@ A Sprint 01 foca em construir o **pipeline de coleta e preparação de dados**, 
 
 ## 📂 Estrutura do Projeto
 
+🆕 **ATUALIZADO COM NOVOS SCRIPTS**
 ```bash
 Lab03-CodeReview/
 │── data/
 │   ├── raw/              # Dados brutos coletados da API
 │   │   └── prs_sample.csv
 │   ├── processed/        # Dados tratados para análise
-│   │   └── top_repos.csv
+│   │   ├── top_repos.csv
+│   │   └── prs_clean.csv
+|   |   └── graficos.py       # 🆕 Geração de gráficos (Chart.js/HTML)   
 │── scripts/              # Scripts de coleta e processamento
 │   ├── fetch_repos.py    # Coleta os repositórios mais populares
 │   ├── fetch_prs.py      # Coleta PRs de cada repositório
 │   ├── process_data.py   # Processa e gera dataset final
-│── .gitignore
-│── .env                  # Contém o GITHUB_TOKEN (NÃO versionar)
+│   ├── correlacao.py     # 🆕 Análise de Correlação de 
+│   
 │── requirements.txt      # Dependências do Python
 │── README.md             # Documentação do projeto
 ```
 
 ---
+
 # ⚙️ Guia de Execução no Windows
 
 ### 🔹 Windows (PowerShell ou CMD)
 
 1. **Clone o repositório**
-
 ```powershell
 git clone https://github.com/seu-usuario/Lab03-CodeReview.git
 cd Lab03-CodeReview
 ```
 
 2. **Crie um ambiente virtual**
-
 ```powershell
 py -m venv .venv
 ```
@@ -77,67 +79,77 @@ py -m venv .venv
 3. **Ative o ambiente virtual**
 
 - No **PowerShell**:
-
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
 - No **CMD**:
-
 ```cmd
 .\.venv\Scripts\activate.bat
 ```
 
 ⚠️ Caso o PowerShell bloqueie a execução, execute antes (apenas na sessão atual):
-
 ```powershell
 Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
 ```
 
 4. **Instale as dependências**
-
 ```powershell
 pip install -r requirements.txt
+```
+
+🆕 **Se der erro de `ModuleNotFoundError`, instale manualmente:**
+```powershell
+pip install scipy pandas numpy matplotlib seaborn
 ```
 
 5. **Configure o Token do GitHub**
 
 Crie um arquivo `.env` na raiz do projeto com o conteúdo:
-
 ```ini
 GITHUB_TOKEN=seu_token_aqui
 ```
 
-6. **Execute os scripts**
-
+6. **Execute os scripts** 
 ```powershell
+# 1. Coleta de repositórios
 python scripts\fetch_repos.py
+
+# 2. Coleta de PRs
 python scripts\fetch_prs.py
+
+# 3. Processamento e limpeza dos dados
 python scripts\process_data.py
+
+# 4. Análise de Correlação de Spearman
+python scripts\correlacao.py
+
+#gerar graficos
+go live data/index.html
 ```
-
-
 
 ## ⚙️ Como Rodar no Linux
 
 ### 1. Clone o repositório
-
 ```bash
 git clone https://github.com/seu-usuario/Lab03-CodeReview.git
 cd Lab03-CodeReview
 ```
 
 ### 2. Crie um ambiente virtual
-
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
 ### 3. Instale as dependências
-
 ```bash
 pip install -r requirements.txt
+```
+
+🆕 **Se der erro, instale manualmente:**
+```bash
+pip install scipy pandas numpy matplotlib seaborn
 ```
 
 ### 4. Configure o Token do GitHub
@@ -145,17 +157,15 @@ pip install -r requirements.txt
 1. Vá em **GitHub → Settings → Developer Settings → Personal Access Tokens → Fine-grained tokens**.
 2. Crie um token com permissão apenas de **leitura em repositórios públicos**.
 3. Crie um arquivo `.env` na raiz do projeto:
-
 ```ini
 GITHUB_TOKEN=seu_token_aqui
 ```
 
 ⚠️ **Importante:** O `.env` nunca deve ser commitado no GitHub (já está no `.gitignore`).
 
-### 5. Execute os scripts
+### 5. Execute os scripts 
 
 **Buscar os repositórios populares:**
-
 ```bash
 python scripts/fetch_repos.py
 ```
@@ -163,7 +173,6 @@ python scripts/fetch_repos.py
 → Gera `data/processed/top_repos.csv`.
 
 **Buscar PRs (exemplo com 5 primeiros repositórios):**
-
 ```bash
 python scripts/fetch_prs.py
 ```
@@ -171,60 +180,26 @@ python scripts/fetch_prs.py
 → Gera `data/raw/prs_sample.csv`.
 
 **Processar dados:**
-
 ```bash
 python scripts/process_data.py
 ```
 
-→ Gera datasets tratados em `data/processed/`.
+→ Gera datasets tratados em `data/processed/prs_clean.csv`.
 
----
+🆕 **Análise de Correlação de Spearman:**
+```bash
+python scripts/correlacao.py
+```
 
-## 📊 Dados Coletados (PRs)
+→ Gera `resultados/correlacoes.csv` com os coeficientes de correlação e p-valores.
 
-Cada PR armazenado contém os seguintes campos principais:
 
-| Campo | Descrição |
-|-------|-----------|
-| `id` | Identificador único |
-| `number` | Número do PR |
-| `title` | Título do PR |
-| `user` | Autor |
-| `created_at` | Data de criação |
-| `closed_at` / `merged_at` | Datas de fechamento/merge |
-| `comments` | Número de comentários |
-| `review_comments` | Número de comentários de revisão |
-| `changed_files` | Quantidade de arquivos alterados |
-| `additions` / `deletions` | Linhas adicionadas/removidas |
-| `state` | Estado final (closed / merged) |
-| `merged` | Booleano se foi aceito |
-| `body_length` | Tamanho da descrição do PR |
+**Visualizar Dashboard com gráficos:**
 
----
+Abra `data/index.html` em um navegador ou use um servidor 
 
-## ✅ Checklist da Sprint 01
 
-- [x] `.gitignore` configurado
-- [x] Ambiente virtual + dependências
-- [x] Token GitHub configurado via `.env`
-- [x] Script de coleta de repositórios (`fetch_repos.py`)
-- [x] Script de coleta de PRs (`fetch_prs.py`)
-- [x] Script de processamento (`process_data.py`)
-- [x] Estrutura de pastas organizada
-- [x] Documentação (README.md)
 
-**📌 Resultado:** ao final da Sprint 01 temos um pipeline de dados completo, capaz de coletar e preparar PRs do GitHub para análises estatísticas futuras.
-
----
-
-## 🚀 Próximos Passos (Sprint 02)
-
-- Expandir coleta para todos os 200 repositórios.
-- Enriquecer o dataset com informações de revisões (reviews).
-- Criar hipóteses iniciais sobre fatores que influenciam no merge dos PRs.
-- Primeira versão do relatório de resultados.
-
----
 
 ## 👨‍💻 Desenvolvido por
 
@@ -233,4 +208,3 @@ PUC Minas - Engenharia de Software - 6º Período
 
 **Pedro Franco**  
 PUC Minas - Engenharia de Software - 6º Período
-
