@@ -130,7 +130,7 @@ def fetch_prs(repo_full_name, state="all", max_pages=2):
 if __name__ == "__main__":
     repos = pd.read_csv("data/processed/top_repos.csv")
     all_prs = []
-    for repo in tqdm(repos["full_name"].tolist()[:5], desc="Repositórios"):
+    for repo in tqdm(repos["full_name"].tolist(), desc="Repositórios"):
         print(f"\n========== Iniciando coleta do repo: {repo} ==========")
         prs_repo = fetch_prs(repo)
         all_prs.extend(prs_repo)

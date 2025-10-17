@@ -215,65 +215,39 @@
     </div>
 
     <script>
-        // Dados CSV embutidos
-        function loadCSV() {
-        // Ler arquivo CSV do diretório do projeto
-        Papa.parse('prs_clean.csv', {
-            download: true,  // ← Importante: faz o download do arquivo
-            header: true,
-            dynamicTyping: true,
-            skipEmptyLines: true,
-            complete: function(results) {
-                allData = results.data.map(row => ({
-                    merged: row.merged === 'True' || row.merged === true,
-                    files_changed: parseInt(row.changed_files) || 0,
-                    lines_added: parseInt(row.additions) || 0,
-                    lines_removed: parseInt(row.deletions) || 0,
-                    body_length: parseInt(row.body_length) || 0,
-                    num_participants: 1,
-                    num_comments: (parseInt(row.comments) || 0) + (parseInt(row.review_comments) || 0),
-                    num_reviews: (parseInt(row.review_comments) || 0) > 0 ? 1 : 0,
-                    review_time_h: parseFloat(row.review_time_h) || 0
-                }));
-                
-                updateStats();
-                createCharts();
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('content').style.display = 'block';
-            },
-            error: function(error) {
-                console.error('Erro ao carregar CSV:', error);
-                document.getElementById('loading').innerHTML = 
-                    '<p style="color: red;">❌ Erro ao carregar o arquivo prs_clean.csv</p>' +
-                    '<p>Verifique se o arquivo está no mesmo diretório do HTML.</p>';
-            }
-        });
-    }
-
         let allData = [];
 
-        function parseCSV() {
-            Papa.parse(csvData, {
+        function loadCSV() {
+            Papa.parse('final_dataset.csv', {
+                download: true,
                 header: true,
                 dynamicTyping: true,
                 skipEmptyLines: true,
                 complete: function(results) {
                     allData = results.data.map(row => ({
-                        merged: row.merged === 'True' || row.merged === true,
+                        merged: row.merged_at !== null && row.merged_at !== '' && row.merged_at !== undefined,
                         files_changed: parseInt(row.changed_files) || 0,
                         lines_added: parseInt(row.additions) || 0,
                         lines_removed: parseInt(row.deletions) || 0,
                         body_length: parseInt(row.body_length) || 0,
-                        num_participants: 1, // Simplificação - seria calculado dos dados
-                        num_comments: (parseInt(row.comments) || 0) + (parseInt(row.review_comments) || 0),
-                        num_reviews: (parseInt(row.review_comments) || 0) > 0 ? 1 : 0, // Simplificação
-                        review_time_h: parseFloat(row.review_time_h) || 0
+                        num_participants: parseInt(row.participants_count) || 1,
+                        num_comments: parseInt(row.comments) || 0,
+                        num_reviews: parseInt(row.review_comments) || 0,
+                        review_time_h: row.created_at && row.closed_at 
+                                       ? (new Date(row.closed_at) - new Date(row.created_at)) / 1000 / 3600
+                                       : 0
                     }));
                     
                     updateStats();
                     createCharts();
                     document.getElementById('loading').style.display = 'none';
                     document.getElementById('content').style.display = 'block';
+                },
+                error: function(error) {
+                    console.error('Erro ao carregar CSV:', error);
+                    document.getElementById('loading').innerHTML = 
+                        '<p style="color: red;">❌ Erro ao carregar o arquivo final_dataset.csv</p>' +
+                        '<p>Verifique se o arquivo está no mesmo diretório do HTML.</p>';
                 }
             });
         }
@@ -291,6 +265,7 @@
         }
 
         function calculateMedian(arr) {
+            if (arr.length === 0) return 0;
             const sorted = [...arr].sort((a, b) => a - b);
             const mid = Math.floor(sorted.length / 2);
             return sorted.length % 2 === 0 
@@ -302,19 +277,13 @@
             const merged = allData.filter(pr => pr.merged);
             const closed = allData.filter(pr => !pr.merged);
             
-            // RQ01: Tamanho vs Status
+            // RQ01-04: Dimensão A - Status Final
             createRQ01Chart(merged, closed);
-            
-            // RQ02: Tempo vs Status
             createRQ02Chart(merged, closed);
-            
-            // RQ03: Descrição vs Status
             createRQ03Chart(merged, closed);
-            
-            // RQ04: Interações vs Status
             createRQ04Chart(merged, closed);
             
-            // RQ05-08: Correlações com número de revisões
+            // RQ05-08: Dimensão B - Número de Revisões
             createRQ05Chart();
             createRQ06Chart();
             createRQ07Chart();
@@ -324,7 +293,6 @@
         function createRQ01Chart(merged, closed) {
             const ctx = document.getElementById('rq01Chart').getContext('2d');
             
-            // Métricas: arquivos, linhas adicionadas, linhas removidas
             const mergedFiles = calculateMedian(merged.map(pr => pr.files_changed));
             const closedFiles = calculateMedian(closed.map(pr => pr.files_changed));
             
@@ -451,22 +419,25 @@
         function createRQ04Chart(merged, closed) {
             const ctx = document.getElementById('rq04Chart').getContext('2d');
             
+            const mergedParticipants = calculateMedian(merged.map(pr => pr.num_participants));
+            const closedParticipants = calculateMedian(closed.map(pr => pr.num_participants));
+            
             const mergedComments = calculateMedian(merged.map(pr => pr.num_comments));
             const closedComments = calculateMedian(closed.map(pr => pr.num_comments));
             
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: ['Número de Comentários'],
+                    labels: ['Participantes', 'Comentários'],
                     datasets: [{
                         label: 'Merged (Mediana)',
-                        data: [mergedComments],
+                        data: [mergedParticipants, mergedComments],
                         backgroundColor: 'rgba(75, 192, 192, 0.6)',
                         borderColor: 'rgba(75, 192, 192, 1)',
                         borderWidth: 2
                     }, {
                         label: 'Closed (Mediana)',
-                        data: [closedComments],
+                        data: [closedParticipants, closedComments],
                         backgroundColor: 'rgba(255, 99, 132, 0.6)',
                         borderColor: 'rgba(255, 99, 132, 1)',
                         borderWidth: 2
@@ -492,21 +463,58 @@
         function createRQ05Chart() {
             const ctx = document.getElementById('rq05Chart').getContext('2d');
             
-            // Scatter plot: Tamanho vs Número de Revisões
-            const data = allData.map(pr => ({
-                x: pr.files_changed + (pr.lines_added + pr.lines_removed) / 100,
-                y: pr.num_reviews
-            }));
+            const reviewGroups = {
+                '0-5': [],
+                '6-10': [],
+                '11-20': [],
+                '20+': []
+            };
+            
+            allData.forEach(pr => {
+                const size = pr.files_changed;
+                const lines = pr.lines_added + pr.lines_removed;
+                
+                if (pr.num_reviews <= 5) {
+                    reviewGroups['0-5'].push({files: size, lines: lines});
+                } else if (pr.num_reviews <= 10) {
+                    reviewGroups['6-10'].push({files: size, lines: lines});
+                } else if (pr.num_reviews <= 20) {
+                    reviewGroups['11-20'].push({files: size, lines: lines});
+                } else {
+                    reviewGroups['20+'].push({files: size, lines: lines});
+                }
+            });
+            
+            const labels = Object.keys(reviewGroups);
+            const filesData = labels.map(label => 
+                reviewGroups[label].length > 0 
+                    ? calculateMedian(reviewGroups[label].map(pr => pr.files))
+                    : 0
+            );
+            const linesData = labels.map(label => 
+                reviewGroups[label].length > 0 
+                    ? calculateMedian(reviewGroups[label].map(pr => pr.lines))
+                    : 0
+            );
             
             new Chart(ctx, {
-                type: 'scatter',
+                type: 'bar',
                 data: {
+                    labels: labels,
                     datasets: [{
-                        label: 'PRs',
-                        data: data,
+                        label: 'Arquivos Modificados (Mediana)',
+                        data: filesData,
                         backgroundColor: 'rgba(102, 126, 234, 0.6)',
                         borderColor: 'rgba(102, 126, 234, 1)',
-                        pointRadius: 5
+                        borderWidth: 2,
+                        yAxisID: 'y'
+                    }, {
+                        label: 'Total de Linhas (Mediana)',
+                        data: linesData,
+                        backgroundColor: 'rgba(118, 75, 162, 0.6)',
+                        borderColor: 'rgba(118, 75, 162, 1)',
+                        borderWidth: 2,
+                        yAxisID: 'y1'
                     }]
                 },
                 options: {
@@ -516,21 +524,37 @@
                         legend: { position: 'top' },
                         title: {
                             display: true,
-                            text: 'Tamanho (arquivos + linhas/100) vs Nº Revisões'
+                            text: 'Tamanho do PR por Faixa de Revisões'
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Tamanho do PR'
+                                text: 'Número de Revisões'
                             }
                         },
                         y: {
-                            beginAtZero: true,
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
                             title: {
                                 display: true,
-                                text: 'Número de Revisões'
+                                text: 'Arquivos'
+                            },
+                            beginAtZero: true
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Linhas'
+                            },
+                            beginAtZero: true,
+                            grid: {
+                                drawOnChartArea: false
                             }
                         }
                     }
@@ -541,20 +565,42 @@
         function createRQ06Chart() {
             const ctx = document.getElementById('rq06Chart').getContext('2d');
             
-            const data = allData.map(pr => ({
-                x: pr.review_time_h,
-                y: pr.num_reviews
-            }));
+            const reviewGroups = {
+                '0-5': [],
+                '6-10': [],
+                '11-20': [],
+                '20+': []
+            };
+            
+            allData.forEach(pr => {
+                if (pr.num_reviews <= 5) {
+                    reviewGroups['0-5'].push(pr.review_time_h);
+                } else if (pr.num_reviews <= 10) {
+                    reviewGroups['6-10'].push(pr.review_time_h);
+                } else if (pr.num_reviews <= 20) {
+                    reviewGroups['11-20'].push(pr.review_time_h);
+                } else {
+                    reviewGroups['20+'].push(pr.review_time_h);
+                }
+            });
+            
+            const labels = Object.keys(reviewGroups);
+            const timeData = labels.map(label => 
+                reviewGroups[label].length > 0 
+                    ? calculateMedian(reviewGroups[label])
+                    : 0
+            );
             
             new Chart(ctx, {
-                type: 'scatter',
+                type: 'bar',
                 data: {
+                    labels: labels,
                     datasets: [{
-                        label: 'PRs',
-                        data: data,
+                        label: 'Tempo de Análise (horas) - Mediana',
+                        data: timeData,
                         backgroundColor: 'rgba(118, 75, 162, 0.6)',
                         borderColor: 'rgba(118, 75, 162, 1)',
-                        pointRadius: 5
+                        borderWidth: 2
                     }]
                 },
                 options: {
@@ -564,21 +610,21 @@
                         legend: { position: 'top' },
                         title: {
                             display: true,
-                            text: 'Tempo de Análise vs Nº Revisões'
+                            text: 'Tempo de Análise por Faixa de Revisões'
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Tempo (horas)'
+                                text: 'Número de Revisões'
                             }
                         },
                         y: {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Número de Revisões'
+                                text: 'Tempo (horas)'
                             }
                         }
                     }
@@ -589,20 +635,42 @@
         function createRQ07Chart() {
             const ctx = document.getElementById('rq07Chart').getContext('2d');
             
-            const data = allData.map(pr => ({
-                x: pr.body_length,
-                y: pr.num_reviews
-            }));
+            const reviewGroups = {
+                '0-5': [],
+                '6-10': [],
+                '11-20': [],
+                '20+': []
+            };
+            
+            allData.forEach(pr => {
+                if (pr.num_reviews <= 5) {
+                    reviewGroups['0-5'].push(pr.body_length);
+                } else if (pr.num_reviews <= 10) {
+                    reviewGroups['6-10'].push(pr.body_length);
+                } else if (pr.num_reviews <= 20) {
+                    reviewGroups['11-20'].push(pr.body_length);
+                } else {
+                    reviewGroups['20+'].push(pr.body_length);
+                }
+            });
+            
+            const labels = Object.keys(reviewGroups);
+            const descData = labels.map(label => 
+                reviewGroups[label].length > 0 
+                    ? calculateMedian(reviewGroups[label])
+                    : 0
+            );
             
             new Chart(ctx, {
-                type: 'scatter',
+                type: 'bar',
                 data: {
+                    labels: labels,
                     datasets: [{
-                        label: 'PRs',
-                        data: data,
+                        label: 'Caracteres na Descrição - Mediana',
+                        data: descData,
                         backgroundColor: 'rgba(255, 159, 64, 0.6)',
                         borderColor: 'rgba(255, 159, 64, 1)',
-                        pointRadius: 5
+                        borderWidth: 2
                     }]
                 },
                 options: {
@@ -612,21 +680,21 @@
                         legend: { position: 'top' },
                         title: {
                             display: true,
-                            text: 'Tamanho da Descrição vs Nº Revisões'
+                            text: 'Tamanho da Descrição por Faixa de Revisões'
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Caracteres na Descrição'
+                                text: 'Número de Revisões'
                             }
                         },
                         y: {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Número de Revisões'
+                                text: 'Caracteres'
                             }
                         }
                     }
@@ -637,20 +705,57 @@
         function createRQ08Chart() {
             const ctx = document.getElementById('rq08Chart').getContext('2d');
             
-            const data = allData.map(pr => ({
-                x: pr.num_comments,
-                y: pr.num_reviews
-            }));
+            const reviewGroups = {
+                '0-5': {participants: [], comments: []},
+                '6-10': {participants: [], comments: []},
+                '11-20': {participants: [], comments: []},
+                '20+': {participants: [], comments: []}
+            };
+            
+            allData.forEach(pr => {
+                if (pr.num_reviews <= 5) {
+                    reviewGroups['0-5'].participants.push(pr.num_participants);
+                    reviewGroups['0-5'].comments.push(pr.num_comments);
+                } else if (pr.num_reviews <= 10) {
+                    reviewGroups['6-10'].participants.push(pr.num_participants);
+                    reviewGroups['6-10'].comments.push(pr.num_comments);
+                } else if (pr.num_reviews <= 20) {
+                    reviewGroups['11-20'].participants.push(pr.num_participants);
+                    reviewGroups['11-20'].comments.push(pr.num_comments);
+                } else {
+                    reviewGroups['20+'].participants.push(pr.num_participants);
+                    reviewGroups['20+'].comments.push(pr.num_comments);
+                }
+            });
+            
+            const labels = Object.keys(reviewGroups);
+            const participantsData = labels.map(label => 
+                reviewGroups[label].participants.length > 0 
+                    ? calculateMedian(reviewGroups[label].participants)
+                    : 0
+            );
+            const commentsData = labels.map(label => 
+                reviewGroups[label].comments.length > 0 
+                    ? calculateMedian(reviewGroups[label].comments)
+                    : 0
+            );
             
             new Chart(ctx, {
-                type: 'scatter',
+                type: 'bar',
                 data: {
+                    labels: labels,
                     datasets: [{
-                        label: 'PRs',
-                        data: data,
+                        label: 'Participantes (Mediana)',
+                        data: participantsData,
                         backgroundColor: 'rgba(54, 162, 235, 0.6)',
                         borderColor: 'rgba(54, 162, 235, 1)',
-                        pointRadius: 5
+                        borderWidth: 2
+                    }, {
+                        label: 'Comentários (Mediana)',
+                        data: commentsData,
+                        backgroundColor: 'rgba(255, 99, 132, 0.6)',
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        borderWidth: 2
                     }]
                 },
                 options: {
@@ -660,21 +765,21 @@
                         legend: { position: 'top' },
                         title: {
                             display: true,
-                            text: 'Número de Comentários vs Nº Revisões'
+                            text: 'Interações por Faixa de Revisões'
                         }
                     },
                     scales: {
                         x: {
                             title: {
                                 display: true,
-                                text: 'Número de Comentários'
+                                text: 'Número de Revisões'
                             }
                         },
                         y: {
                             beginAtZero: true,
                             title: {
                                 display: true,
-                                text: 'Número de Revisões'
+                                text: 'Quantidade'
                             }
                         }
                     }
@@ -682,9 +787,8 @@
             });
         }
 
-           loadCSV();
         // Inicializar
-        parseCSV();
+        loadCSV();
     </script>
 </body>
 </html>
